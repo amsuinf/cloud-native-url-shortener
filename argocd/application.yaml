@@ -1,0 +1,36 @@
+# ArgoCD continuously reconciles the cluster to match this Helm chart in git.
+# A merge to main (with the CD workflow bumping image.tag) is the only way to
+# change production — no manual kubectl, full audit trail, instant rollback
+# via `git revert`.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: url-shortener
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: url-shortener
+  source:
+    repoURL: https://github.com/your-username/cloud-native-url-shortener.git
+    targetRevision: main
+    path: deploy/helm/url-shortener
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: url-shortener
+  syncPolicy:
+    automated:
+      prune: true      # delete resources removed from git
+      selfHeal: true   # revert manual drift in the cluster
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+tfplan
+*.tfvars
+
+# Helm — vendored dependency tarballs (reproduced via `helm dependency build`)
+deploy/helm/**/charts/*.tgz
+
+# Local / OS
+.DS_Store
+*.log

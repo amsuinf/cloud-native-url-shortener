@@ -1,0 +1,44 @@
+name: CD (GitOps promote)
+
+# After CI publishes an image for a commit on main, bump the image tag the
+# Helm chart points at and commit it back. ArgoCD watches this repo and syncs
+# the change into the cluster — so deploys are just git commits (auditable,
+# revertable, no kubectl from CI).
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pin image tag to the built commit
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          yq -i ".image.tag = \"${SHA}\"" deploy/helm/url-shortener/values.yaml
+
+      - name: Commit promotion
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No image change to promote."
+            exit 0
+          fi
+          git commit -am "chore(deploy): promote url-shortener to ${SHA}"
+          git push

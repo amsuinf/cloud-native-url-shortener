@@ -1,0 +1,13 @@
+apiVersion: v2
+name: url-shortener
+description: Cloud-native URL shortener service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Asif
+dependencies:
+  - name: redis
+    version: "20.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

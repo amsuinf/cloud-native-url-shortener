@@ -1,0 +1,90 @@
+# Default values. Override per-environment with -f values-<env>.yaml or via
+# the ArgoCD Application spec.
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/your-username/url-shortener
+  tag: ""          # defaults to .Chart.AppVersion when empty
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+# Application configuration -> rendered into a ConfigMap and injected as env.
+config:
+  BASE_URL: "https://sho.rt"
+  CODE_LENGTH: "7"
+  LINK_TTL_SECONDS: "0"
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "production"
+
+# Where the app finds Redis. When redis.enabled=true the Bitnami subchart
+# provisions one in-cluster and this points at it.
+redisUrl: "redis://url-shortener-redis-master:6379/0"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: sho.rt
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Spread pods across nodes/zones so a single node loss can't take the service
+# fully down.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Hardened pod/container security posture (CIS / restricted PSS).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Prometheus Operator ServiceMonitor (scrape /metrics).
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+
+# Bitnami Redis subchart (set false to use an external/managed Redis).
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false

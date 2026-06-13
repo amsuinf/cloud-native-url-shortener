@@ -1,0 +1,46 @@
+# PrometheusRule consumed by the Prometheus Operator. SLO-style alerts built
+# on the metrics the app exports (http_requests_total, latency histogram).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: url-shortener-alerts
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: url-shortener.slo
+      rules:
+        # Page if >5% of requests are 5xx over 5 minutes.
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+              / sum(rate(http_requests_total[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High 5xx error rate on url-shortener"
+            description: "{{ $value | humanizePercentage }} of requests are failing."
+
+        # p99 latency budget: 500ms.
+        - alert: HighLatencyP99
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "p99 latency above 500ms"
+            description: "p99 request latency is {{ $value }}s."
+
+        # No pods ready -> hard outage.
+        - alert: ServiceDown
+          expr: |
+            absent(up{job=~".*url-shortener.*"} == 1)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "url-shortener has no healthy targets"
+            description: "Prometheus cannot scrape any url-shortener pod."
